@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Archivos almacenados en S3</title>
+    <style>
+      body { margin: 0; padding: 28px 16px; font-family: Arial, sans-serif; background: #f3f4f6; color: #1f2937; }
+      main { max-width: 1050px; margin: auto; padding: 24px; border-radius: 12px; background: white; box-shadow: 0 8px 24px #0000001a; }
+      h1 { margin: 0; }
+      .acciones { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+      button, .volver { padding: 8px 11px; border: 0; border-radius: 6px; color: white; font: inherit; font-size: 14px; cursor: pointer; text-decoration: none; }
+      .volver { background: #2563eb; }
+      .eliminar { background: #dc2626; }
+      .tabla-contenedor { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 7px 9px; border-bottom: 1px solid #d1d5db; text-align: left; font-size: 14px; line-height: 1.25; }
+      th { background: #f9fafb; }
+      .nombre { min-width: 220px; overflow-wrap: anywhere; word-break: break-word; }
+      .fecha { white-space: nowrap; }
+      .accion { width: 1%; white-space: nowrap; }
+      .sin-archivos { text-align: center; color: #6b7280; }
+      #estado { min-height: 24px; }
+      .exito { color: #15803d; }
+      .error { color: #b91c1c; }
+      .alerta-subida { display: none; margin-bottom: 16px; padding: 12px 14px; border: 1px solid #86efac; border-radius: 7px; color: #166534; background: #dcfce7; }
+      .alerta-subida.visible { display: block; }
+      @media (max-width: 600px) {
+        body { padding: 16px 8px; }
+        main { padding: 16px; }
+        .acciones { align-items: flex-start; flex-direction: column; }
+        .nombre { min-width: 150px; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="acciones">
+        <h1>Archivos almacenados</h1>
+        <a class="volver" href="/">Volver a subir archivo</a>
+      </div>
+      <p id="estado" role="status" aria-live="polite"></p>
+      <div id="alerta-subida" class="alerta-subida" role="status" aria-live="polite"></div>
+      <div class="tabla-contenedor">
+        <table>
+          <thead><tr><th>Nombre</th>
+          <th>Tamaño</th>
+          <th>Fecha</th><th>Eliminar</th>
+          </tr></thead>
+          <tbody id="lista-archivos"></tbody>
+        </table>
+      </div>
+    </main>
+
+    <script>
+      const listaArchivos = document.querySelector("#lista-archivos");
+      const estado = document.querySelector("#estado");
+      const alertaSubida = document.querySelector("#alerta-subida");
+
+      // Muestra durante cinco segundos la confirmación enviada desde index.html.
+      function mostrarNotificacionSubida() {
+        const parametros = new URLSearchParams(window.location.search);
+
+        if (parametros.get("subido") !== "1") return;
+
+        const nombreArchivo = parametros.get("archivo") || "Archivo";
+        alertaSubida.textContent = `Archivo "${nombreArchivo}" subido y procesado correctamente.`;
+        alertaSubida.classList.add("visible");
+
+        setTimeout(() => {
+          alertaSubida.classList.remove("visible");
+          alertaSubida.textContent = "";
+          history.replaceState({}, "", "/lista.html");
+        }, 5000);
+      }
+
+      async function cargarArchivos() {
+        try {
+          const respuesta = await fetch("/api/archivos");
+          const resultado = await leerJson(respuesta);
+          if (!respuesta.ok) throw new Error(resultado.mensaje);
+          listaArchivos.replaceChildren();
+
+          if (resultado.length === 0) {
+            const fila = listaArchivos.insertRow();
+            const celda = fila.insertCell();
+            celda.colSpan = 4;
+            celda.className = "sin-archivos";
+            celda.textContent = "No hay archivos subidos";
+            return;
+          }
+
+          resultado.forEach((archivo) => {
+            const fila = listaArchivos.insertRow();
+            agregarCelda(fila, archivo.nombre, "nombre");
+            agregarCelda(fila, formatearTamano(archivo.tamano));
+            agregarCelda(fila, formatearFecha(archivo.fecha), "fecha");
+
+            const celdaAccion = fila.insertCell();
+            celdaAccion.className = "accion";
+            const boton = document.createElement("button");
+            boton.textContent = "Eliminar";
+            boton.className = "eliminar";
+            boton.addEventListener("click", () => eliminarArchivo(archivo.key));
+            celdaAccion.appendChild(boton);
+          });
+        } catch (error) {
+          mostrarEstado(error.message || "No se pudo cargar la lista.", "error");
+        }
+      }
+
+      async function eliminarArchivo(key) {
+        if (!confirm(`¿Deseas eliminar ${key}?`)) return;
+        try {
+          const respuesta = await fetch(`/api/archivos/${encodeURIComponent(key)}`, { method: "DELETE" });
+          const resultado = await leerJson(respuesta);
+          if (!respuesta.ok) throw new Error(resultado.mensaje);
+
+          mostrarEstado(resultado.mensaje, "exito");
+          await cargarArchivos();
+        } catch (error) {
+          mostrarEstado(error.message || "No se pudo eliminar el archivo.", "error");
+        }
+      }
+
+      function agregarCelda(fila, texto, clase = "") {
+        const celda = fila.insertCell();
+        celda.textContent = texto;
+        celda.className = clase;
+      }
+
+      function formatearTamano(bytes) {
+        if (bytes === 0) return "0 B";
+        const unidades = ["B", "KB", "MB", "GB"];
+        const indice = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), unidades.length - 1);
+        const valor = bytes / Math.pow(1024, indice);
+        return `${valor.toFixed(indice === 0 ? 0 : 1)} ${unidades[indice]}`;
+      }
+
+      function formatearFecha(fecha) {
+        return new Date(fecha).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" });
+      }
+
+      async function leerJson(respuesta) {
+        const tipo = respuesta.headers.get("content-type") || "";
+        if (!tipo.includes("application/json")) {
+          throw new Error("El servidor no devolvió una respuesta JSON válida.");
+        }
+        return respuesta.json();
+      }
+
+      function mostrarEstado(mensaje, tipo) {
+        estado.textContent = mensaje;
+        estado.className = tipo;
+      }
+
+      mostrarNotificacionSubida();
+      cargarArchivos();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rutina programada | Actividad 02</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #07111f; color: #eaf2ff; }
+    main { width: min(92%, 620px); padding: 2.5rem; border: 1px solid #29415f; border-radius: 22px; background: #0d1b2d; box-shadow: 0 24px 70px #0008; }
+    .tag { color: #65d6ad; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .75rem; }
+    h1 { margin: .6rem 0; font-size: clamp(2rem, 7vw, 3.3rem); line-height: 1.05; }
+    p { color: #aabbd0; line-height: 1.6; }
+    label { display: block; margin: 1.5rem 0 .55rem; font-weight: 700; }
+    input[type="time"] { width: 100%; padding: .9rem 1rem; font: inherit; color: inherit; background: #07111f; border: 1px solid #3b5677; border-radius: 10px; }
+    .check { display: flex; gap: .7rem; align-items: center; margin: 1rem 0; color: #c9d7e8; font-weight: 500; }
+    button { width: 100%; padding: 1rem; border: 0; border-radius: 10px; font: inherit; font-weight: 800; color: #062018; background: #65d6ad; cursor: pointer; }
+    button:hover { background: #86e7c4; }
+    button:disabled { opacity: .55; cursor: wait; }
+    #estado { min-height: 3.5rem; margin-top: 1.2rem; padding: 1rem; border-radius: 10px; background: #07111f; color: #dbe8f8; }
+    #estado.error { color: #ff9c9c; border: 1px solid #813e48; }
+    code { color: #8de8c8; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="tag">Actividad 02 · AWS Lambda + EventBridge</div>
+    <h1>Programa tu rutina</h1>
+    <p>Elige una hora de Lima. EventBridge ejecutará automáticamente la Lambda <code>rutina-programada</code>.</p>
+    <form id="formulario">
+      <label for="hora">Hora de ejecución</label>
+      <input id="hora" name="hora" type="time" required>
+      <label class="check"><input id="cadaMinuto" type="checkbox"> Probar cada 1 minuto</label>
+      <button id="boton" type="submit">Programar rutina</button>
+    </form>
+    <div id="estado" role="status">Consultando programación actual…</div>
+  </main>
+  <script>
+    const formulario = document.querySelector('#formulario');
+    const hora = document.querySelector('#hora');
+    const cadaMinuto = document.querySelector('#cadaMinuto');
+    const boton = document.querySelector('#boton');
+    const estado = document.querySelector('#estado');
+
+    function mostrar(mensaje, esError = false) {
+      estado.textContent = mensaje;
+      estado.classList.toggle('error', esError);
+    }
+
+    cadaMinuto.addEventListener('change', () => {
+      hora.disabled = cadaMinuto.checked;
+      hora.required = !cadaMinuto.checked;
+    });
+
+    formulario.addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+      boton.disabled = true;
+      mostrar('Guardando programación…');
+      try {
+        const respuesta = await fetch('/api/programar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hora: hora.value, cadaMinuto: cadaMinuto.checked }),
+        });
+        const datos = await respuesta.json();
+        if (!respuesta.ok) throw new Error(datos.error);
+        mostrar(datos.mensaje);
+      } catch (error) {
+        mostrar(`Error: ${error.message}`, true);
+      } finally {
+        boton.disabled = false;
+      }
+    });
+
+    async function consultarEstado() {
+      try {
+        const respuesta = await fetch('/api/estado');
+        const datos = await respuesta.json();
+        if (!respuesta.ok) throw new Error(datos.error);
+        mostrar(datos.mensaje);
+        if (datos.hora) hora.value = datos.hora;
+        cadaMinuto.checked = Boolean(datos.cadaMinuto);
+        cadaMinuto.dispatchEvent(new Event('change'));
+      } catch (error) {
+        mostrar(`No se pudo consultar Floci: ${error.message}`, true);
+      }
+    }
+
+    consultarEstado();
+  </script>
+</body>
+</html>

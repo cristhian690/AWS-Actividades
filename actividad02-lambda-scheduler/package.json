@@ -1,0 +1,21 @@
+{
+  "name": "actividad02-lambda-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicación web para programar una Lambda con EventBridge en Floci.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "test:local": "node -e \"require('./lambda').handler().then(console.log)\""
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch-events": "^3.901.0",
+    "@aws-sdk/client-lambda": "^3.901.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

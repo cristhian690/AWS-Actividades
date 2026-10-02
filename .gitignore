@@ -1,0 +1,28 @@
+# Dependencias de Node.js
+node_modules/
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Paquetes generados para Lambda
+*.zip
+
+# Respuestas generadas por AWS CLI
+respuesta.json
+
+# Logs y archivos temporales
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+tmp/
+temp/
+
+# Archivos del sistema y del editor
+.DS_Store
+Thumbs.db
+.vscode/

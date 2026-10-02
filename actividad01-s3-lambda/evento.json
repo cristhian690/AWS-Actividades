@@ -1,0 +1,14 @@
+{
+  "Records": [
+    {
+      "s3": {
+        "bucket": {
+          "name": "mi-bucket"
+        },
+        "object": {
+          "key": "prueba.txt"
+        }
+      }
+    }
+  ]
+}
